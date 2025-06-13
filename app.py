@@ -148,11 +148,12 @@ if st.session_state.data_frame_display is not None:
     # --- Příprava souborů ke stažení ---
     df_to_export = st.session_state.data_frame_hourly_for_export.copy() # Pracujeme na kopii
 
-    # 1. Příprava CSV ke stažení (s desetinnou čárkou)
+    # 1. Příprava CSV ke stažení (s desetinnou tečkou)
     csv_buffer = io.StringIO()
-    df_to_export.to_csv(csv_buffer, index=True, encoding='utf-8-sig', decimal=',')
+    df_to_export.to_csv(csv_buffer, index=True, encoding='utf-8-sig', decimal='.') # Změna na decimal='.'
+    # encoding='utf-8-sig' je důležité pro správné zobrazení diakritiky v Excelu při otevření CSV
 
-    # 2. Příprava XLSX ke stažení (s desetinnou čárkou jako skutečné číslo)
+    # 2. Příprava XLSX ke stažení (jako skutečné číslo, Excel si poradí s tečkou/čárkou dle nastavení)
     excel_buffer = io.BytesIO()
 
     # PŘEVOD INDEXU NA TIMEZONE-NAIVE PŘED EXPORTEM DO EXCELU
@@ -162,22 +163,18 @@ if st.session_state.data_frame_display is not None:
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         df_to_export.to_excel(writer, index=True, sheet_name='Data')
 
-        workbook = writer.book
-        sheet = writer.sheets['Data']
-
-        # Definice formátu čísel. Použijeme např. '# ##0,00' (mezera pro tisíce, čárka pro desetinná místa)
-        numeric_format_string = '# ##0,00'
-
-        # Iterace přes řádky a sloupce (včetně hlaviček) a aplikování formátu
-        # pandas to_excel zapisuje index do prvního sloupce.
-        # Data začínají od 2. sloupce (index 1) a 2. řádku (index 1)
-        for row_idx, row in enumerate(sheet.iter_rows()):
-            for col_idx, cell in enumerate(row):
-                # Přeskočíme řádek hlaviček (row_idx == 0) a sloupec s indexem (col_idx == 0)
-                if row_idx > 0 and col_idx > 0:
-                    # Je důležité, aby hodnota v buňce byla skutečné číslo, ne None/text
-                    if isinstance(cell.value, (int, float, np.number)):
-                        cell.number_format = numeric_format_string
+        # V této verzi NEBUDEME ručně nastavovat number_format,
+        # necháme Excel, aby si s formátováním čísel poradil sám
+        # podle regionálního nastavení uživatele.
+        # Takto budou hodnoty zapsány jako čistá čísla.
+        # Workbook a sheet objekty zde nejsou potřeba, pokud neaplikujeme vlastní styly
+        # workbook = writer.book
+        # sheet = writer.sheets['Data']
+        # for row_idx, row in enumerate(sheet.iter_rows()):
+        #    for col_idx, cell in enumerate(row):
+        #        if row_idx > 0 and col_idx > 0:
+        #            if isinstance(cell.value, (int, float, np.number)):
+        #                cell.number_format = '# ##0,00' # Tuto řádku jsme odstranili!
 
 
     excel_buffer.seek(0) # Resetuj pozici bufferu na začátek
@@ -211,7 +208,6 @@ if st.session_state.data_frame_display is not None:
 
     with col3:
         if st.session_state.download_message_show_csv:
-            st.success("CSV soubor byl úspěšně připraven ke stažení! ✅")
+            st.success("CSV soubor byl úspěšně připraven ke stažení! ✅ (Čísla s desetinnou tečkou)")
         elif st.session_state.download_message_show_xlsx:
-            st.success(f"XLSX soubor byl úspěšně připraven ke stažení! ✅")
-            #st.info("Formátování čísel s desetinnou čárkou je vynuceno v souboru. Data zůstávají číselná.")
+            st.success("XLSX soubor byl úspěšně připraven ke stažení! ✅ (Čísla jsou uložena jako číselné hodnoty. Formát zobrazení desetinných míst závisí na nastavení vašeho Excelu.)")
